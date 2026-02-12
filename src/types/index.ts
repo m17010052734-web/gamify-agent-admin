@@ -33,6 +33,13 @@ export interface Game {
   updated_at: string;
 }
 
+export interface GameDetail extends Game {
+  generation_mode: string;
+  tech_stack: string;
+  artifact_type: string;
+  version_count: number;
+}
+
 export interface GameReviewListResponse {
   items: Game[];
   total: number;
@@ -81,6 +88,62 @@ export interface CreditFlowItem {
 
 export interface CreditFlowResponse {
   items: CreditFlowItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+// Review log types
+export interface ReviewLog {
+  id: string;
+  game_id: string;
+  game_title: string;
+  admin_id: string;
+  status: 'approved' | 'rejected';
+  message: string | null;
+  created_at: string;
+}
+
+export interface ReviewLogListResponse {
+  items: ReviewLog[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+// Index game library types
+export interface VersionCodeInfo {
+  html_code: string | null;
+  code_snapshot: string | null;
+}
+
+export interface IndexGame {
+  id: string;
+  title: string;
+  description: string | null;
+  cover_url: string | null;
+  thumbnail_url: string | null;
+  source_type: 'url' | 'code';
+  game_url: string | null;
+  version_code_id: string | null;
+  category: string;
+  tags: string[];
+  show_in_banner: boolean;
+  weight: number;
+  status: 'active' | 'inactive';
+  play_count: number;
+  like_count: number;
+  share_count: number;
+  comment_count: number;
+  created_at: string;
+  updated_at: string;
+  version_code?: VersionCodeInfo;
+}
+
+export interface IndexGameListResponse {
+  items: IndexGame[];
   total: number;
   page: number;
   page_size: number;

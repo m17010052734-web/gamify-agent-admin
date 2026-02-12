@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { LockClosedIcon } from '@heroicons/react/24/solid';
+import { authApi } from '../services/api';
 
 export default function Login() {
-  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -15,18 +14,19 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // TODO: Replace with actual login API call
-      // For now, simulate login with hardcoded credentials
-      if (email === 'admin@gamifyagent.com' && password === 'admin123') {
-        // Simulate API response with token
-        const token = 'mock_admin_token_' + Date.now();
-        localStorage.setItem('admin_token', token);
-        navigate('/');
-      } else {
-        setError('邮箱或密码错误');
+      const response = await authApi.login({ email, password });
+
+      // 保存 Token（响应拦截器已经处理了 response.data.data -> response.data）
+      localStorage.setItem('admin_token', response.data.token);
+      if (response.data.refresh_token) {
+        localStorage.setItem('refresh_token', response.data.refresh_token);
       }
-    } catch (err) {
-      setError('登录失败，请重试');
+
+      // 强制刷新页面以确保认证状态更新
+      window.location.href = '/';
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || err.response?.data?.detail || '登录失败，请重试';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

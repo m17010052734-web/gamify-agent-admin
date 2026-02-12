@@ -3,11 +3,9 @@ import { statsApi } from '../services/api';
 import type { PlatformStats } from '../types';
 import {
   UsersIcon,
-  GamepadIcon,
+  PuzzlePieceIcon,
   CreditCardIcon,
-  CheckCircleIcon,
   ClockIcon,
-  XCircleIcon,
 } from '@heroicons/react/24/outline';
 
 export default function Dashboard() {
@@ -62,7 +60,7 @@ export default function Dashboard() {
     {
       title: '总游戏数',
       value: stats.total_games,
-      icon: GamepadIcon,
+      icon: PuzzlePieceIcon,
       color: 'bg-green-500',
       subStats: [
         { label: '已发布', value: stats.published_games },

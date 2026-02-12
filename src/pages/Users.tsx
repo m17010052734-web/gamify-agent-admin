@@ -5,9 +5,8 @@ import {
   MagnifyingGlassIcon,
   PlusIcon,
   MinusIcon,
-  BanknotesIcon,
-  XMarkIcon,
 } from '@heroicons/react/24/outline';
+import Modal from '../components/Modal';
 
 export default function Users() {
   const [users, setUsers] = useState<User[]>([]);
@@ -25,6 +24,11 @@ export default function Users() {
   const [creditAmount, setCreditAmount] = useState('');
   const [creditReason, setCreditReason] = useState('');
   const [creditFlow, setCreditFlow] = useState<CreditFlowItem[]>([]);
+
+  // Loading states
+  const [adjustingCredit, setAdjustingCredit] = useState(false);
+  const [loadingFlow, setLoadingFlow] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
 
   useEffect(() => {
     loadUsers();
@@ -54,9 +58,10 @@ export default function Users() {
   };
 
   const handleAdjustCredit = async () => {
-    if (!selectedUser || !creditAmount || !creditReason) return;
+    if (!selectedUser || !creditAmount || !creditReason || adjustingCredit) return;
 
     try {
+      setAdjustingCredit(true);
       await userApi.adjustCredit({
         user_id: selectedUser.id,
         amount: parseInt(creditAmount),
@@ -70,25 +75,34 @@ export default function Users() {
     } catch (err) {
       console.error('Failed to adjust credit:', err);
       alert('积分调整失败');
+    } finally {
+      setAdjustingCredit(false);
     }
   };
 
   const handleViewCreditFlow = async (user: User) => {
+    if (loadingFlow) return;
+
     setSelectedUser(user);
     try {
+      setLoadingFlow(true);
       const response = await userApi.getCreditFlow({ user_id: user.id });
       setCreditFlow(response.data.items);
       setShowFlowModal(true);
     } catch (err) {
       console.error('Failed to load credit flow:', err);
       alert('加载积分流水失败');
+    } finally {
+      setLoadingFlow(false);
     }
   };
 
   const handleUpdateStatus = async (user: User, newStatus: string) => {
+    if (updatingStatus === user.id) return;
     if (!confirm(`确定要${newStatus === 'banned' ? '封禁' : '解封'}该用户吗？`)) return;
 
     try {
+      setUpdatingStatus(user.id);
       await userApi.updateStatus({
         user_id: user.id,
         status: newStatus,
@@ -99,6 +113,8 @@ export default function Users() {
     } catch (err) {
       console.error('Failed to update status:', err);
       alert('状态更新失败');
+    } finally {
+      setUpdatingStatus(null);
     }
   };
 
@@ -123,7 +139,7 @@ export default function Users() {
               placeholder="搜索用户昵称..."
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
             />
           </div>
@@ -233,27 +249,30 @@ export default function Users() {
                           setSelectedUser(user);
                           setShowCreditModal(true);
                         }}
-                        className="text-primary hover:text-blue-800 cursor-pointer"
+                        disabled={adjustingCredit}
+                        className="text-primary hover:text-blue-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        调整积分
+                        {adjustingCredit ? '处理中...' : '调整积分'}
                       </button>
                       <button
                         onClick={() => handleViewCreditFlow(user)}
-                        className="text-secondary hover:text-blue-600 cursor-pointer"
+                        disabled={loadingFlow}
+                        className="text-secondary hover:text-blue-600 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        积分流水
+                        {loadingFlow ? '加载中...' : '积分流水'}
                       </button>
                       <button
                         onClick={() =>
                           handleUpdateStatus(user, user.status === 'active' ? 'banned' : 'active')
                         }
+                        disabled={updatingStatus === user.id}
                         className={`${
                           user.status === 'active'
                             ? 'text-red-600 hover:text-red-800'
                             : 'text-green-600 hover:text-green-800'
-                        } cursor-pointer`}
+                        } cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
-                        {user.status === 'active' ? '封禁' : '解封'}
+                        {updatingStatus === user.id ? '处理中...' : user.status === 'active' ? '封禁' : '解封'}
                       </button>
                     </td>
                   </tr>
@@ -290,141 +309,122 @@ export default function Users() {
       </div>
 
       {/* Credit Adjustment Modal */}
-      {showCreditModal && selectedUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-heading font-semibold text-gray-900">
-                调整积分 - {selectedUser.nickname}
-              </h3>
-              <button
-                onClick={() => setShowCreditModal(false)}
-                className="text-gray-400 hover:text-gray-600 cursor-pointer"
-              >
-                <XMarkIcon className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  当前余额
-                </label>
-                <div className="text-2xl font-heading font-bold text-gray-900">
-                  {selectedUser.credit_balance}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  调整金额（正数增加，负数减少）
-                </label>
-                <input
-                  type="number"
-                  value={creditAmount}
-                  onChange={(e) => setCreditAmount(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="输入调整金额"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  调整原因
-                </label>
-                <textarea
-                  value={creditReason}
-                  onChange={(e) => setCreditReason(e.target.value)}
-                  rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="输入调整原因"
-                />
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowCreditModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-smooth cursor-pointer"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={handleAdjustCredit}
-                  disabled={!creditAmount || !creditReason}
-                  className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-smooth"
-                >
-                  确认调整
-                </button>
-              </div>
+      <Modal
+        isOpen={showCreditModal && !!selectedUser}
+        onClose={() => setShowCreditModal(false)}
+        title={`调整积分 - ${selectedUser?.nickname || ''}`}
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              当前余额
+            </label>
+            <div className="text-2xl font-heading font-bold text-gray-900">
+              {selectedUser?.credit_balance}
             </div>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              调整金额（正数增加，负数减少）
+            </label>
+            <input
+              type="number"
+              value={creditAmount}
+              onChange={(e) => setCreditAmount(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              placeholder="输入调整金额"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              调整原因
+            </label>
+            <textarea
+              value={creditReason}
+              onChange={(e) => setCreditReason(e.target.value)}
+              rows={3}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              placeholder="输入调整原因"
+            />
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowCreditModal(false)}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-smooth cursor-pointer"
+            >
+              取消
+            </button>
+            <button
+              onClick={handleAdjustCredit}
+              disabled={!creditAmount || !creditReason || adjustingCredit}
+              className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-smooth"
+            >
+              {adjustingCredit ? '处理中...' : '确认调整'}
+            </button>
+          </div>
         </div>
-      )}
+      </Modal>
 
       {/* Credit Flow Modal */}
-      {showFlowModal && selectedUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-heading font-semibold text-gray-900">
-                积分流水 - {selectedUser.nickname}
-              </h3>
-              <button
-                onClick={() => setShowFlowModal(false)}
-                className="text-gray-400 hover:text-gray-600 cursor-pointer"
+      <Modal
+        isOpen={showFlowModal && !!selectedUser}
+        onClose={() => setShowFlowModal(false)}
+        title={`积分流水 - ${selectedUser?.nickname || ''}`}
+        maxWidth="2xl"
+        maxHeight="max-h-[80vh]"
+      >
+        <div className="space-y-3">
+          {creditFlow.length === 0 ? (
+            <div className="text-center text-gray-500 py-8">暂无流水记录</div>
+          ) : (
+            creditFlow.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
               >
-                <XMarkIcon className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="space-y-3">
-              {creditFlow.length === 0 ? (
-                <div className="text-center text-gray-500 py-8">暂无流水记录</div>
-              ) : (
-                creditFlow.map((item) => (
+                <div className="flex items-center gap-3">
                   <div
-                    key={item.id}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
+                    className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      item.change_type === 'income'
+                        ? 'bg-green-100 text-green-600'
+                        : 'bg-red-100 text-red-600'
+                    }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          item.change_type === 'income'
-                            ? 'bg-green-100 text-green-600'
-                            : 'bg-red-100 text-red-600'
-                        }`}
-                      >
-                        {item.change_type === 'income' ? (
-                          <PlusIcon className="w-5 h-5" />
-                        ) : (
-                          <MinusIcon className="w-5 h-5" />
-                        )}
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {item.source_type}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {item.description || '无描述'}
-                        </div>
-                        <div className="text-xs text-gray-400">
-                          {new Date(item.created_at).toLocaleString('zh-CN')}
-                        </div>
-                      </div>
+                    {item.change_type === 'income' ? (
+                      <PlusIcon className="w-5 h-5" />
+                    ) : (
+                      <MinusIcon className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">
+                      {item.source_type}
                     </div>
-                    <div className="text-right">
-                      <div
-                        className={`text-lg font-heading font-bold ${
-                          item.change_type === 'income' ? 'text-green-600' : 'text-red-600'
-                        }`}
-                      >
-                        {item.change_type === 'income' ? '+' : '-'}
-                        {item.amount}
-                      </div>
-                      <div className="text-xs text-gray-500">余额: {item.balance_after}</div>
+                    <div className="text-xs text-gray-500">
+                      {item.description || '无描述'}
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {new Date(item.created_at).toLocaleString('zh-CN')}
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
+                </div>
+                <div className="text-right">
+                  <div
+                    className={`text-lg font-heading font-bold ${
+                      item.change_type === 'income' ? 'text-green-600' : 'text-red-600'
+                    }`}
+                  >
+                    {item.change_type === 'income' ? '+' : '-'}
+                    {item.amount}
+                  </div>
+                  <div className="text-xs text-gray-500">余额: {item.balance_after}</div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
-      )}
+      </Modal>
     </div>
   );
 }
