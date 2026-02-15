@@ -1,12 +1,4 @@
 import axios from "axios";
-import type {
-  UserListResponse,
-  GameReviewListResponse,
-  CreditConfigListResponse,
-  PlatformStats,
-  CreditFlowResponse,
-  ReviewLogListResponse,
-} from "../types";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8088",
@@ -182,6 +174,7 @@ export const userApi = {
     page_size?: number;
     status?: string;
     keyword?: string;
+    user_type?: string;
   }) => api.get("/admin/list-users", { params }),
 
   adjustCredit: (data: { user_id: string; amount: number; reason: string }) =>
@@ -273,6 +266,9 @@ export const indexGameApi = {
     html_code?: string;
     cover_url: string;
     thumbnail_url?: string;
+    screenshots?: string[];
+    author_name?: string;
+    author_avatar_url?: string;
     category: string;
     tags?: string[];
     show_in_banner?: boolean;
@@ -284,10 +280,14 @@ export const indexGameApi = {
     data: {
       title?: string;
       description?: string;
+      source_type?: "url" | "code";
       game_url?: string;
       html_code?: string;
       cover_url?: string;
       thumbnail_url?: string;
+      screenshots?: string[];
+      author_name?: string;
+      author_avatar_url?: string;
       category?: string;
       tags?: string[];
       status?: string;
@@ -315,15 +315,190 @@ export const indexGameApi = {
   },
 };
 
+// Creative template APIs
+export const creativeTemplateApi = {
+  getCreativeTemplates: (params: {
+    page?: number;
+    page_size?: number;
+    category?: string;
+    status?: string;
+    keyword?: string;
+  }) => api.get("/admin/creative-templates", { params }),
+
+  createCreativeTemplate: (data: {
+    name: string;
+    description?: string;
+    prompt: string;
+    category: string;
+    cover_url?: string;
+    tags?: string[];
+    example_output?: string;
+    game_source_type?: "none" | "code" | "url";
+    game_url?: string;
+    game_code?: string;
+    sort_order?: number;
+    is_hot?: boolean;
+    is_new?: boolean;
+  }) => api.post("/admin/creative-templates", data),
+
+  updateCreativeTemplate: (
+    templateId: string,
+    data: {
+      name?: string;
+      description?: string;
+      prompt?: string;
+      category?: string;
+      cover_url?: string;
+      tags?: string[];
+      example_output?: string;
+      game_source_type?: "none" | "code" | "url";
+      game_url?: string;
+      game_code?: string;
+      sort_order?: number;
+      is_hot?: boolean;
+      is_new?: boolean;
+      status?: string;
+    },
+  ) => api.put(`/admin/creative-templates/${templateId}`, data),
+
+  deleteCreativeTemplate: (templateId: string) =>
+    api.delete(`/admin/creative-templates/${templateId}`),
+
+  uploadCover: async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post("/admin/upload-game-cover", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
+
+  toggleTemplateStatus: (templateId: string) =>
+    api.post(`/admin/creative-templates/${templateId}/toggle-status`),
+};
+
 // Home categories APIs
 export const homeApi = {
+  // 获取已发布分类（前端用）
   getCategories: () => api.get("/admin/home/categories"),
 
+  // 获取所有分类（管理后台用，包含未发布）
+  getAllCategories: () => api.get("/admin/home/categories/all"),
+
+  // 创建分类
+  createCategory: (data: {
+    key: string;
+    name: string;
+    icon?: string;
+  }) => api.post("/admin/home/categories", data),
+
+  // 更新分类
+  updateCategory: (
+    categoryId: number,
+    data: {
+      key?: string;
+      name?: string;
+      icon?: string;
+      is_published?: boolean;
+      is_active?: boolean;
+      sort_order?: number;
+    },
+  ) => api.put(`/admin/home/categories/${categoryId}`, data),
+
+  // 删除分类
+  deleteCategory: (categoryId: number) =>
+    api.delete(`/admin/home/categories/${categoryId}`),
+
+  // 批量更新排序
+  updateSortOrders: (orders: Array<{ id: number; sort_order: number }>) =>
+    api.post("/admin/home/categories/sort", { orders }),
+
+  // 发布/取消发布分类
+  togglePublish: (categoryId: number, isPublished: boolean) =>
+    api.put(`/admin/home/categories/${categoryId}/publish`, null, {
+      params: { is_published: isPublished },
+    }),
+
+  // 兼容旧接口
   updateCategories: (
     categories: Array<{ key: string; name: string; icon?: string }>,
   ) => api.put("/admin/home/categories", { categories }),
 
   resetCategories: () => api.post("/admin/home/categories/reset"),
+
+  // 创意模板分类
+  getCreativeCategories: () => api.get("/admin/home/creative-categories"),
+
+  getAllCreativeCategories: () =>
+    api.get("/admin/home/creative-categories/all"),
+
+  createCreativeCategory: (data: {
+    key: string;
+    name: string;
+    icon?: string;
+    description?: string;
+  }) => api.post("/admin/home/creative-categories", data),
+
+  updateCreativeCategory: (
+    categoryId: number,
+    data: {
+      key: string;
+      name: string;
+      icon?: string;
+      description?: string;
+      is_published?: boolean;
+      is_active?: boolean;
+      sort_order?: number;
+    },
+  ) => api.put(`/admin/home/creative-categories/${categoryId}`, data),
+
+  deleteCreativeCategory: (categoryId: number) =>
+    api.delete(`/admin/home/creative-categories/${categoryId}`),
+
+  updateCreativeSortOrders: (
+    orders: Array<{ id: number; sort_order: number }>,
+  ) => api.post("/admin/home/creative-categories/sort", { orders }),
+
+  toggleCreativePublish: (categoryId: number, isPublished: boolean) =>
+    api.put(`/admin/home/creative-categories/${categoryId}/publish`, null, {
+      params: { is_published: isPublished },
+    }),
+
+  updateCreativeCategories: (
+    categories: Array<{
+      key: string;
+      name: string;
+      icon?: string;
+      description?: string;
+    }>,
+  ) => api.put("/admin/home/creative-categories", { categories }),
+
+  resetCreativeCategories: () =>
+    api.post("/admin/home/creative-categories/reset"),
+};
+
+// Cache Management APIs
+export const cacheApi = {
+  // 获取缓存统计
+  getStats: () => api.get("/admin/cache/stats"),
+
+  // 清除缓存
+  clearCache: (cacheType: "home" | "plaza" | "projects" | "all" = "all") =>
+    api.post("/admin/cache/clear", { cache_type: cacheType }),
+
+  // 清除首页缓存
+  clearHomeCache: () => api.post("/admin/cache/clear-home"),
+
+  // 清除广场缓存
+  clearPlazaCache: () => api.post("/admin/cache/clear-plaza"),
+
+  // 清除项目缓存
+  clearProjectsCache: () => api.post("/admin/cache/clear-projects"),
+
+  // 按 pattern 清除缓存
+  clearByPattern: (pattern: string) =>
+    api.post("/admin/cache/clear-pattern", { pattern }),
 };
 
 export default api;

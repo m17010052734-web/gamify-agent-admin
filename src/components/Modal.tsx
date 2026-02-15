@@ -7,7 +7,7 @@ interface ModalProps {
   title: string;
   children: ReactNode;
   footer?: ReactNode;
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl' | '7xl';
   maxHeight?: string;
 }
 
@@ -28,6 +28,11 @@ export default function Modal({
     lg: 'max-w-lg',
     xl: 'max-w-xl',
     '2xl': 'max-w-2xl',
+    '3xl': 'max-w-3xl',
+    '4xl': 'max-w-4xl',
+    '5xl': 'max-w-5xl',
+    '6xl': 'max-w-6xl',
+    '7xl': 'max-w-7xl',
   };
 
   return (
@@ -35,7 +40,7 @@ export default function Modal({
       <div
         className={`bg-white rounded-lg w-full ${maxWidthClasses[maxWidth]} ${
           maxHeight ? maxHeight : 'max-h-[90vh]'
-        } flex flex-col`}
+        } flex flex-col max-w-full mx-2 sm:mx-0`}
       >
         {/* Fixed Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">

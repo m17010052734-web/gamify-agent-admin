@@ -1,8 +1,24 @@
 import { useEffect, useState } from 'react';
 import { gameApi } from '../services/api';
 import type { Game, GameDetail } from '../types';
-import { CheckCircleIcon, XCircleIcon, EyeIcon } from '@heroicons/react/24/outline';
+import {
+  CheckCircleIcon,
+  XCircleIcon,
+  EyeIcon,
+  PlayIcon,
+  CubeIcon,
+  BoltIcon,
+  CodeBracketIcon,
+  DocumentIcon,
+  FolderIcon,
+} from '@heroicons/react/24/outline';
+import {
+  CheckCircleIcon as CheckCircleIconSolid,
+  ClockIcon as ClockIconSolid,
+  LockClosedIcon as LockClosedIconSolid,
+} from '@heroicons/react/24/solid';
 import Modal from '../components/Modal';
+import { useToast } from '../contexts/ToastContext';
 
 export default function Games() {
   const [games, setGames] = useState<Game[]>([]);
@@ -23,8 +39,15 @@ export default function Games() {
   const [gameDetail, setGameDetail] = useState<GameDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
+  // Preview modal
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+
   // Loading state
   const [reviewing, setReviewing] = useState(false);
+
+  const toast = useToast();
 
   useEffect(() => {
     loadGames();
@@ -60,10 +83,10 @@ export default function Games() {
       setShowReviewModal(false);
       setReviewMessage('');
       loadGames();
-      alert(`游戏${reviewAction === 'approve' ? '通过' : '拒绝'}审核成功`);
+      toast.success(`游戏${reviewAction === 'approve' ? '通过' : '拒绝'}审核成功`);
     } catch (err) {
       console.error('Failed to review game:', err);
-      alert('审核失败');
+      toast.error('审核失败');
     } finally {
       setReviewing(false);
     }
@@ -83,37 +106,70 @@ export default function Games() {
       setGameDetail(response.data);
     } catch (err) {
       console.error('Failed to load game detail:', err);
-      alert('加载游戏详情失败');
+      toast.error('加载游戏详情失败');
       setShowDetailModal(false);
     } finally {
       setLoadingDetail(false);
     }
   };
 
+  const openPreviewModal = async (game: Game) => {
+    setShowPreviewModal(true);
+    setLoadingPreview(true);
+    try {
+      // 使用已有的详情接口获取游戏信息
+      const response = await gameApi.getGameDetail(game.id);
+      const detail = response.data;
+      
+      const gameCode = detail?.version_code?.html_code || detail?.version_code?.code_snapshot;
+      if (gameCode) {
+        // Create a blob URL for the game code
+        const blob = new Blob([gameCode], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        setPreviewUrl(url);
+      } else {
+        toast.warning('该游戏暂无可预览内容');
+        setShowPreviewModal(false);
+      }
+    } catch (err) {
+      console.error('Failed to load game preview:', err);
+      toast.error('加载游戏预览失败');
+      setShowPreviewModal(false);
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  const closePreviewModal = () => {
+    setShowPreviewModal(false);
+    if (previewUrl && previewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setPreviewUrl(null);
+  };
+
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-heading font-bold text-gray-900">游戏审核</h1>
-          <p className="mt-1 text-sm text-gray-600">审核用户提交的游戏内容</p>
-        </div>
+      <div>
+        <h1 className="text-xl sm:text-2xl font-heading font-bold text-gray-900">游戏审核</h1>
+        <p className="mt-1 text-sm text-gray-600">审核用户提交的游戏内容</p>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <label className="text-sm font-medium text-gray-700">状态筛选</label>
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <label className="text-sm font-medium text-gray-700 shrink-0">状态</label>
             <select
               value={status}
               onChange={(e) => {
                 setStatus(e.target.value);
                 setPage(1);
               }}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer transition-colors duration-200 hover:border-gray-400"
+              className="flex-1 sm:flex-none px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer transition-colors duration-200 hover:border-gray-400"
             >
               <option value="">全部状态</option>
               <option value="pending">待审核</option>
@@ -132,26 +188,26 @@ export default function Games() {
 
       {/* Games Grid */}
       {loading ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 sm:p-12">
           <div className="flex flex-col items-center justify-center space-y-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-primary"></div>
             <p className="text-gray-500">加载中...</p>
           </div>
         </div>
       ) : games.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 sm:p-12">
           <div className="text-center">
-            <div className="mx-auto h-12 w-12 text-gray-400 mb-4">
+            <div className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mb-4">
               <svg className="w-full h-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
               </svg>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-1">暂无游戏</h3>
+            <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-1">暂无游戏</h3>
             <p className="text-sm text-gray-500">当前筛选条件下没有找到游戏</p>
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {games.map((game) => (
             <div
               key={game.id}
@@ -176,7 +232,7 @@ export default function Games() {
                 {/* Status Badge */}
                 <div className="absolute top-3 right-3">
                   <span
-                    className={`inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full shadow-sm backdrop-blur-sm ${
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full shadow-lg backdrop-blur-md ${
                       game.status === 'pending'
                         ? 'bg-amber-500/90 text-white'
                         : game.status === 'shared'
@@ -190,39 +246,44 @@ export default function Games() {
                         : 'bg-gray-500/90 text-white'
                     }`}
                   >
+                    {game.status === 'pending' && <ClockIconSolid className="w-3.5 h-3.5" />}
+                    {game.status === 'shared' && <CheckCircleIconSolid className="w-3.5 h-3.5" />}
+                    {game.status === 'rejected' && <XCircleIcon className="w-3.5 h-3.5" />}
+                    {game.status === 'private' && <LockClosedIconSolid className="w-3.5 h-3.5" />}
+                    {game.status === 'archived' && <CubeIcon className="w-3.5 h-3.5" />}
                     {game.status === 'pending'
-                      ? '⏳ 待审核'
+                      ? '待审核'
                       : game.status === 'shared'
-                      ? '✓ 已共享'
+                      ? '已共享'
                       : game.status === 'rejected'
-                      ? '✗ 已拒绝'
+                      ? '已拒绝'
                       : game.status === 'private'
-                      ? '🔒 私有'
+                      ? '私有'
                       : game.status === 'archived'
-                      ? '📦 已归档'
+                      ? '已归档'
                       : game.status}
                   </span>
                 </div>
               </div>
 
               {/* Content */}
-              <div className="p-5">
-                <h3 className="text-lg font-heading font-semibold text-gray-900 mb-2 line-clamp-1 group-hover:text-primary transition-colors">
+              <div className="p-3 sm:p-5">
+                <h3 className="text-base sm:text-lg font-heading font-semibold text-gray-900 mb-1.5 sm:mb-2 line-clamp-1 group-hover:text-primary transition-colors">
                   {game.title}
                 </h3>
-                <p className="text-sm text-gray-600 mb-4 line-clamp-2 min-h-[2.5rem]">
+                <p className="text-sm text-gray-600 mb-3 sm:mb-4 line-clamp-2 min-h-[2.5rem]">
                   {game.description || '暂无描述'}
                 </p>
 
                 {/* Meta Info */}
-                <div className="flex items-center justify-between text-xs text-gray-500 mb-4 pb-4 border-b border-gray-100">
-                  <div className="flex items-center gap-1">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-3 sm:mb-4 pb-3 sm:pb-4 border-b border-gray-100">
+                  <div className="flex items-center gap-1 min-w-0">
+                    <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
-                    <span className="font-medium">{game.author_nickname}</span>
+                    <span className="font-medium truncate">{game.author_nickname}</span>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 shrink-0">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
@@ -232,19 +293,28 @@ export default function Games() {
 
                 {/* Actions */}
                 <div className="space-y-2">
-                  <button
-                    onClick={() => openDetailModal(game)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors duration-200 cursor-pointer font-medium"
-                  >
-                    <EyeIcon className="w-4 h-4" />
-                    查看详情
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => openDetailModal(game)}
+                      className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors duration-200 cursor-pointer font-medium text-sm sm:text-base"
+                    >
+                      <EyeIcon className="w-4 h-4" />
+                      详情
+                    </button>
+                    <button
+                      onClick={() => openPreviewModal(game)}
+                      className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 cursor-pointer font-medium text-sm sm:text-base"
+                    >
+                      <PlayIcon className="w-4 h-4" />
+                      预览
+                    </button>
+                  </div>
                   {game.status === 'pending' && (
                     <div className="flex gap-2">
                       <button
                         onClick={() => openReviewModal(game, 'approve')}
                         disabled={reviewing}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm"
+                        className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm text-sm sm:text-base"
                       >
                         <CheckCircleIcon className="w-4 h-4" />
                         通过
@@ -252,7 +322,7 @@ export default function Games() {
                       <button
                         onClick={() => openReviewModal(game, 'reject')}
                         disabled={reviewing}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm"
+                        className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm text-sm sm:text-base"
                       >
                         <XCircleIcon className="w-4 h-4" />
                         拒绝
@@ -268,22 +338,22 @@ export default function Games() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 px-6 py-4 flex items-center justify-between">
-          <div className="text-sm text-gray-700">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="text-sm text-gray-700 text-center sm:text-left">
             第 {page} / {totalPages} 页
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 justify-center">
             <button
               onClick={() => setPage(Math.max(1, page - 1))}
               disabled={page === 1}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-smooth"
+              className="flex-1 sm:flex-none px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-smooth"
             >
               上一页
             </button>
             <button
               onClick={() => setPage(Math.min(totalPages, page + 1))}
               disabled={page === totalPages}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-smooth"
+              className="flex-1 sm:flex-none px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-smooth"
             >
               下一页
             </button>
@@ -383,23 +453,26 @@ export default function Games() {
               </div>
               <div className="space-y-1">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">项目类型</p>
-                <p className="text-base text-gray-900">
+                <p className="text-base text-gray-900 flex items-center gap-2">
+                  <CubeIcon className="w-5 h-5 text-purple-500" />
                   {gameDetail.project_type === 'mini_game'
-                    ? '🎮 小游戏'
+                    ? '小游戏'
                     : gameDetail.project_type === 'h5_page'
-                    ? '📱 H5页面'
-                    : '🎴 互动卡片'}
+                    ? 'H5页面'
+                    : '互动卡片'}
                 </p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">生成模式</p>
-                <p className="text-base text-gray-900">
-                  {gameDetail.generation_mode === 'fast' ? '⚡ 快速模式' : '💎 质量模式'}
+                <p className="text-base text-gray-900 flex items-center gap-2">
+                  <BoltIcon className="w-5 h-5 text-amber-500" />
+                  {gameDetail.generation_mode === 'fast' ? '快速模式' : '质量模式'}
                 </p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">技术栈</p>
                 <p className="text-base text-gray-900">
+                  <CodeBracketIcon className="w-5 h-5 inline mr-2 text-blue-500" />
                   {gameDetail.tech_stack === 'html_canvas'
                     ? 'HTML Canvas'
                     : gameDetail.tech_stack === 'html_css'
@@ -409,8 +482,18 @@ export default function Games() {
               </div>
               <div className="space-y-1">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">产物类型</p>
-                <p className="text-base text-gray-900">
-                  {gameDetail.artifact_type === 'html_single' ? '📄 单文件' : '📁 多文件'}
+                <p className="text-base text-gray-900 flex items-center gap-2">
+                  {gameDetail.artifact_type === 'html_single' ? (
+                    <>
+                      <DocumentIcon className="w-5 h-5 text-green-500" />
+                      单文件
+                    </>
+                  ) : (
+                    <>
+                      <FolderIcon className="w-5 h-5 text-orange-500" />
+                      多文件
+                    </>
+                  )}
                 </p>
               </div>
               <div className="space-y-1">
@@ -420,7 +503,7 @@ export default function Games() {
               <div className="space-y-1">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">状态</p>
                 <span
-                  className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ${
                     gameDetail.status === 'pending'
                       ? 'bg-amber-100 text-amber-800'
                       : gameDetail.status === 'shared'
@@ -434,16 +517,21 @@ export default function Games() {
                       : 'bg-gray-100 text-gray-800'
                   }`}
                 >
+                  {gameDetail.status === 'pending' && <ClockIconSolid className="w-4 h-4" />}
+                  {gameDetail.status === 'shared' && <CheckCircleIconSolid className="w-4 h-4" />}
+                  {gameDetail.status === 'rejected' && <XCircleIcon className="w-4 h-4" />}
+                  {gameDetail.status === 'private' && <LockClosedIconSolid className="w-4 h-4" />}
+                  {gameDetail.status === 'archived' && <CubeIcon className="w-4 h-4" />}
                   {gameDetail.status === 'pending'
-                    ? '⏳ 待审核'
+                    ? '待审核'
                     : gameDetail.status === 'shared'
-                    ? '✓ 已共享'
+                    ? '已共享'
                     : gameDetail.status === 'rejected'
-                    ? '✗ 已拒绝'
+                    ? '已拒绝'
                     : gameDetail.status === 'private'
-                    ? '🔒 私有'
+                    ? '私有'
                     : gameDetail.status === 'archived'
-                    ? '📦 已归档'
+                    ? '已归档'
                     : gameDetail.status}
                 </span>
               </div>
@@ -493,6 +581,49 @@ export default function Games() {
               </svg>
             </div>
             <p className="text-gray-500">加载失败，请重试</p>
+          </div>
+        )}
+      </Modal>
+
+      {/* Preview Modal */}
+      <Modal
+        isOpen={showPreviewModal}
+        onClose={closePreviewModal}
+        title="游戏预览"
+        maxWidth="4xl"
+      >
+        {loadingPreview ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+            <p className="text-gray-500">加载预览中...</p>
+          </div>
+        ) : previewUrl ? (
+          <div className="space-y-4">
+            <div className="relative w-full aspect-video bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+              <iframe
+                src={previewUrl}
+                className="w-full h-full"
+                sandbox="allow-scripts allow-same-origin allow-popups"
+                title="游戏预览"
+              />
+            </div>
+            <div className="flex items-center justify-between text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                <span>预览模式已启用</span>
+              </div>
+              <span>请在预览后判断内容是否正常健康</span>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <div className="mx-auto h-12 w-12 text-gray-400 mb-4">
+              <svg className="w-full h-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <p className="text-gray-500">无法加载预览</p>
           </div>
         )}
       </Modal>

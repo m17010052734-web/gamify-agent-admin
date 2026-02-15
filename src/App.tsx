@@ -9,6 +9,9 @@ import Credits from "./pages/Credits";
 import ReviewLogs from "./pages/ReviewLogs";
 import IndexGameLibrary from "./pages/IndexGameLibrary";
 import Categories from "./pages/Categories";
+import CreativeCategories from "./pages/CreativeCategories";
+import CreativeTemplates from "./pages/CreativeTemplates";
+import CacheManagement from "./pages/CacheManagement";
 import { ToastProvider } from "./contexts/ToastContext";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -64,6 +67,9 @@ function App() {
           <Route path="games" element={<Games />} />
           <Route path="index-games" element={<IndexGameLibrary />} />
           <Route path="categories" element={<Categories />} />
+          <Route path="creative-categories" element={<CreativeCategories />} />
+          <Route path="creative-templates" element={<CreativeTemplates />} />
+          <Route path="cache-management" element={<CacheManagement />} />
           <Route path="credits" element={<Credits />} />
           <Route path="review-logs" element={<ReviewLogs />} />
         </Route>

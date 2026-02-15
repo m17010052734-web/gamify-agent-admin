@@ -1,8 +1,10 @@
 // User types
 export interface User {
   id: string;
+  email: string | null;
   nickname: string | null;
   avatar_url: string | null;
+  user_type: 'user' | 'admin';
   status: 'active' | 'banned';
   work_count: number;
   follower_count: number;
@@ -33,11 +35,17 @@ export interface Game {
   updated_at: string;
 }
 
+export interface VersionCodeInfo {
+  html_code: string | null;
+  code_snapshot: string | null;
+}
+
 export interface GameDetail extends Game {
   generation_mode: string;
   tech_stack: string;
   artifact_type: string;
   version_count: number;
+  version_code?: VersionCodeInfo;
 }
 
 export interface GameReviewListResponse {
@@ -125,6 +133,9 @@ export interface IndexGame {
   description: string | null;
   cover_url: string | null;
   thumbnail_url: string | null;
+  screenshots: string[];
+  author_name: string | null;
+  author_avatar_url: string | null;
   source_type: 'url' | 'code';
   game_url: string | null;
   version_code_id: string | null;

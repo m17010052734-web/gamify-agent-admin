@@ -10,6 +10,7 @@ import {
   XMarkIcon,
   ClipboardDocumentListIcon,
   RectangleStackIcon,
+  CircleStackIcon,
 } from "@heroicons/react/24/outline";
 
 const navigation = [
@@ -18,8 +19,10 @@ const navigation = [
   { name: "游戏审核", href: "/games", icon: PuzzlePieceIcon },
   { name: "首页游戏库", href: "/index-games", icon: RectangleStackIcon },
   { name: "分类配置", href: "/categories", icon: RectangleStackIcon },
+  { name: "创意模板", href: "/creative-templates", icon: RectangleStackIcon },
   { name: "审核日志", href: "/review-logs", icon: ClipboardDocumentListIcon },
   { name: "积分配置", href: "/credits", icon: CreditCardIcon },
+  { name: "缓存管理", href: "/cache-management", icon: CircleStackIcon },
 ];
 
 export default function Layout() {

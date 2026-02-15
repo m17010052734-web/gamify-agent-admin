@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { indexGameApi } from '../services/api';
+import { indexGameApi, homeApi } from '../services/api';
 import type { IndexGame } from '../types';
 import {
   PlusIcon,
@@ -7,9 +7,12 @@ import {
   TrashIcon,
   StarIcon,
   MagnifyingGlassIcon,
+  LinkIcon,
+  CodeBracketIcon,
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import Modal from '../components/Modal';
+import ConfirmModal from '../components/ConfirmModal';
 import { useToast } from '../contexts/ToastContext';
 
 export default function IndexGameLibrary() {
@@ -22,6 +25,9 @@ export default function IndexGameLibrary() {
   const [category, setCategory] = useState('');
   const [sourceType, setSourceType] = useState('');
   const [keyword, setKeyword] = useState('');
+  
+  // 动态分类
+  const [categories, setCategories] = useState<{key: string; name: string}[]>([]);
 
   // Create/Edit modal
   const [showEditModal, setShowEditModal] = useState(false);
@@ -34,7 +40,10 @@ export default function IndexGameLibrary() {
     html_code: '',
     cover_url: '',
     thumbnail_url: '',
-    category: 'mini_game',
+    screenshots: [] as string[],
+    author_name: '',
+    author_avatar_url: '',
+    category: '',
     tags: [] as string[],
     show_in_banner: false,
     weight: 0,
@@ -47,9 +56,26 @@ export default function IndexGameLibrary() {
   const [uploadingCover, setUploadingCover] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false);
 
+  // Delete confirmation modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingGame, setDeletingGame] = useState<{ id: string; title: string } | null>(null);
+
   useEffect(() => {
     loadGames();
+    loadCategories();
   }, [page, category, sourceType, keyword]);
+
+  // 加载动态分类
+  const loadCategories = async () => {
+    try {
+      const response = await homeApi.getAllCategories();
+      if (response.data && response.data.categories) {
+        setCategories(response.data.categories);
+      }
+    } catch (err) {
+      console.error('Failed to load categories:', err);
+    }
+  };
 
   const loadGames = async () => {
     try {
@@ -80,6 +106,9 @@ export default function IndexGameLibrary() {
       html_code: '',
       cover_url: '',
       thumbnail_url: '',
+      screenshots: [],
+      author_name: '',
+      author_avatar_url: '',
       category: 'mini_game',
       tags: [],
       show_in_banner: false,
@@ -98,6 +127,9 @@ export default function IndexGameLibrary() {
       html_code: game.version_code?.html_code || '',
       cover_url: game.cover_url || '',
       thumbnail_url: game.thumbnail_url || '',
+      screenshots: game.screenshots || [],
+      author_name: game.author_name || '',
+      author_avatar_url: game.author_avatar_url || '',
       category: game.category,
       tags: game.tags || [],
       show_in_banner: game.show_in_banner,
@@ -154,13 +186,15 @@ export default function IndexGameLibrary() {
     }
   };
 
-  const handleDelete = async (gameId: string) => {
-    if (!confirm('确定要删除这个游戏吗?')) return;
+  const handleDelete = async () => {
+    if (!deletingGame) return;
 
     try {
-      setDeleting(gameId);
-      await indexGameApi.deleteIndexGame(gameId);
+      setDeleting(deletingGame.id);
+      await indexGameApi.deleteIndexGame(deletingGame.id);
       toast.success('删除成功');
+      setShowDeleteModal(false);
+      setDeletingGame(null);
       loadGames();
     } catch (err) {
       console.error('Failed to delete:', err);
@@ -168,6 +202,11 @@ export default function IndexGameLibrary() {
     } finally {
       setDeleting(null);
     }
+  };
+
+  const openDeleteModal = (game: IndexGame) => {
+    setDeletingGame({ id: game.id, title: game.title });
+    setShowDeleteModal(true);
   };
 
   const handleToggleBanner = async (gameId: string) => {
@@ -213,28 +252,73 @@ export default function IndexGameLibrary() {
     }
   };
 
+  const [uploadingScreenshots, setUploadingScreenshots] = useState(false);
+
+  const handleScreenshotsUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    // 验证文件
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/')) {
+        toast.warning('请选择图片文件');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.warning('图片大小不能超过 5MB');
+        return;
+      }
+    }
+
+    try {
+      setUploadingScreenshots(true);
+      
+      // 逐个上传图片
+      for (const file of Array.from(files)) {
+        const response = await indexGameApi.uploadGameCover(file);
+        setFormData(prev => ({ 
+          ...prev, 
+          screenshots: [...prev.screenshots, response.data.url] 
+        }));
+      }
+      toast.success('上传成功');
+    } catch (err) {
+      console.error('Failed to upload screenshots:', err);
+      toast.error('上传失败');
+    } finally {
+      setUploadingScreenshots(false);
+    }
+  };
+
+  const removeScreenshot = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      screenshots: prev.screenshots.filter((_, i) => i !== index)
+    }));
+  };
+
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-gray-900">首页游戏库</h1>
+          <h1 className="text-xl sm:text-2xl font-heading font-bold text-gray-900">首页游戏库</h1>
           <p className="mt-1 text-sm text-gray-600">管理首页展示的游戏和轮播图</p>
         </div>
         <button
           onClick={openCreateModal}
-          className="flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-smooth cursor-pointer"
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-smooth cursor-pointer"
         >
-          <PlusIcon className="w-5 h-5 mr-2" />
+          <PlusIcon className="w-5 h-5" />
           创建游戏
         </button>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">分类</label>
             <select
@@ -243,33 +327,35 @@ export default function IndexGameLibrary() {
                 setCategory(e.target.value);
                 setPage(1);
               }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer"
+              className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer text-sm sm:text-base"
             >
-              <option value="">全部</option>
-              <option value="mini_game">小游戏</option>
-              <option value="h5_page">H5页面</option>
-              <option value="interactive_card">互动卡片</option>
+              <option value="">全部分类</option>
+              {categories.map((cat) => (
+                <option key={cat.key} value={cat.key}>
+                  {cat.name}
+                </option>
+              ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">来源类型</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">来源</label>
             <select
               value={sourceType}
               onChange={(e) => {
                 setSourceType(e.target.value);
                 setPage(1);
               }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer"
+              className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer text-sm sm:text-base"
             >
               <option value="">全部</option>
               <option value="url">URL</option>
               <option value="code">代码</option>
             </select>
           </div>
-          <div className="md:col-span-2">
+          <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">搜索</label>
             <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 sm:w-5 h-4 sm:h-5 text-gray-400" />
               <input
                 type="text"
                 value={keyword}
@@ -278,16 +364,16 @@ export default function IndexGameLibrary() {
                   setPage(1);
                 }}
                 placeholder="搜索标题或描述..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full pl-9 sm:pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm sm:text-base"
               />
             </div>
           </div>
         </div>
-        <div className="mt-4 text-sm text-gray-600">共 {total} 个游戏</div>
+        <div className="mt-3 sm:mt-4 text-sm text-gray-600">共 {total} 个游戏</div>
       </div>
 
       {/* Games Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
         {loading ? (
           <div className="col-span-full bg-white rounded-xl shadow-sm border border-gray-200 p-16">
             <div className="flex flex-col items-center justify-center space-y-4">
@@ -346,22 +432,34 @@ export default function IndexGameLibrary() {
                 {/* Top Badges */}
                 <div className="absolute top-3 left-3 right-3 flex items-start justify-between gap-2">
                   <span
-                    className={`px-3 py-1.5 text-xs font-bold rounded-full backdrop-blur-md shadow-lg ${
+                    className={`inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-full backdrop-blur-md shadow-lg ${
                       game.source_type === 'url'
                         ? 'bg-purple-500/90 text-white'
                         : 'bg-amber-500/90 text-white'
                     }`}
                   >
-                    {game.source_type === 'url' ? '🔗 URL' : '💻 代码'}
+                    {game.source_type === 'url' ? (
+                      <>
+                        <LinkIcon className="w-3.5 h-3.5" />
+                        URL
+                      </>
+                    ) : (
+                      <>
+                        <CodeBracketIcon className="w-3.5 h-3.5" />
+                        代码
+                      </>
+                    )}
                   </span>
                   <div className="flex flex-col gap-2">
                     {game.show_in_banner && (
-                      <span className="px-3 py-1.5 text-xs font-bold rounded-full bg-green-500/90 text-white backdrop-blur-md shadow-lg">
-                        ⭐ 轮播图
+                      <span className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-full bg-green-500/90 text-white backdrop-blur-md shadow-lg">
+                        <StarIconSolid className="w-3.5 h-3.5" />
+                        轮播
                       </span>
                     )}
-                    <span className="px-3 py-1.5 text-xs font-bold rounded-full bg-blue-500/90 text-white backdrop-blur-md shadow-lg">
-                      ⚡ {game.weight}
+                    <span className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-full bg-blue-500/90 text-white backdrop-blur-md shadow-lg">
+                      <span className="text-base leading-none">⚡</span>
+                      {game.weight}
                     </span>
                   </div>
                 </div>
@@ -383,11 +481,7 @@ export default function IndexGameLibrary() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
                     <span className="font-medium">
-                      {game.category === 'mini_game'
-                        ? '小游戏'
-                        : game.category === 'h5_page'
-                        ? 'H5页面'
-                        : '互动卡片'}
+                      {categories.find(c => c.key === game.category)?.name || game.category}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 text-purple-600 font-semibold">
@@ -427,7 +521,7 @@ export default function IndexGameLibrary() {
                     </button>
                   </div>
                   <button
-                    onClick={() => handleDelete(game.id)}
+                    onClick={() => openDeleteModal(game)}
                     disabled={deleting === game.id}
                     className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-lg hover:from-red-700 hover:to-red-600 transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-md hover:shadow-lg"
                   >
@@ -443,22 +537,22 @@ export default function IndexGameLibrary() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 px-6 py-4 flex items-center justify-between">
-          <div className="text-sm text-gray-700">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="text-sm text-gray-700 text-center sm:text-left">
             第 {page} / {totalPages} 页
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 justify-center">
             <button
               onClick={() => setPage(Math.max(1, page - 1))}
               disabled={page === 1}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-smooth"
+              className="flex-1 sm:flex-none px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-smooth"
             >
               上一页
             </button>
             <button
               onClick={() => setPage(Math.min(totalPages, page + 1))}
               disabled={page === totalPages}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-smooth"
+              className="flex-1 sm:flex-none px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-smooth"
             >
               下一页
             </button>
@@ -629,6 +723,114 @@ export default function IndexGameLibrary() {
             )}
           </div>
 
+          {/* Screenshots */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              游戏截图
+            </label>
+
+            {/* Upload Button */}
+            <div className="mb-3">
+              <label className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 cursor-pointer font-medium shadow-sm">
+                <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                {uploadingScreenshots ? '上传中...' : '上传截图'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleScreenshotsUpload}
+                  disabled={uploadingScreenshots}
+                  className="hidden"
+                />
+              </label>
+              <p className="mt-1 text-xs text-gray-500">支持多张图片，可一次选择多张</p>
+            </div>
+
+            {/* Screenshots Preview */}
+            {formData.screenshots.length > 0 && (
+              <div className="mt-3">
+                <p className="text-xs font-medium text-gray-600 mb-2">已上传截图 ({formData.screenshots.length})</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {formData.screenshots.map((url, index) => (
+                    <div key={index} className="relative group aspect-video bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                      <img
+                        src={url}
+                        alt={`截图 ${index + 1}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://via.placeholder.com/200x150?text=加载失败';
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeScreenshot(index)}
+                        className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs py-1 text-center">
+                        {index + 1}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Author Info */}
+          <div className="border-t border-gray-200 pt-4 mt-4">
+            <div className="grid grid-cols-2 gap-4">
+              {/* Author Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  作者名称
+                </label>
+                <input
+                  type="text"
+                  value={formData.author_name}
+                  onChange={(e) => setFormData({ ...formData, author_name: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="输入作者名称"
+                />
+              </div>
+
+              {/* Author Avatar URL */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  作者头像 URL
+                </label>
+                <input
+                  type="url"
+                  value={formData.author_avatar_url}
+                  onChange={(e) => setFormData({ ...formData, author_avatar_url: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="https://example.com/avatar.jpg"
+                />
+              </div>
+            </div>
+            {/* Author Avatar Preview */}
+            {formData.author_avatar_url && (
+              <div className="mt-3">
+                <p className="text-xs font-medium text-gray-600 mb-2">头像预览</p>
+                <div className="w-16 h-16 rounded-full overflow-hidden border border-gray-200">
+                  <img
+                    src={formData.author_avatar_url}
+                    alt="作者头像预览"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/64?text=加载失败';
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Category */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -639,9 +841,11 @@ export default function IndexGameLibrary() {
               onChange={(e) => setFormData({ ...formData, category: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer"
             >
-              <option value="mini_game">小游戏</option>
-              <option value="h5_page">H5页面</option>
-              <option value="interactive_card">互动卡片</option>
+              {categories.map((cat) => (
+                <option key={cat.key} value={cat.key}>
+                  {cat.name}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -673,6 +877,28 @@ export default function IndexGameLibrary() {
           </div>
         </div>
       </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setDeletingGame(null);
+        }}
+        onConfirm={handleDelete}
+        title="确认删除游戏"
+        message={
+          <div>
+            <p className="mb-2">
+              确定要删除游戏 <span className="font-semibold">{deletingGame?.title}</span> 吗？
+            </p>
+            <p className="text-sm text-gray-500">此操作无法撤销。</p>
+          </div>
+        }
+        confirmText="删除"
+        type="danger"
+        loading={!!deleting}
+      />
     </div>
   );
 }
