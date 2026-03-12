@@ -204,6 +204,9 @@ export const gameApi = {
     message?: string;
   }) => api.post("/admin/review-game", data),
 
+  offlineGame: (data: { game_id: string; message?: string }) =>
+    api.post("/admin/offline-game", data),
+
   getGameDetail: (gameId: string) => api.get(`/admin/game-detail/${gameId}`),
 };
 
@@ -499,6 +502,85 @@ export const cacheApi = {
   // 按 pattern 清除缓存
   clearByPattern: (pattern: string) =>
     api.post("/admin/cache/clear-pattern", { pattern }),
+};
+
+// LLM 配置 APIs
+export const llmApi = {
+  // Vendors
+  getVendors: () => api.get("/admin/llm/vendors"),
+
+  // API Keys
+  getApiKeys: () => api.get("/admin/llm/api-keys"),
+
+  createApiKey: (data: {
+    key_id: string;
+    vendor_name: string;
+    key_env_name: string;
+    api_key_value?: string;
+    model?: string;
+    base_url?: string;
+    auth_type?: string;
+    description?: string;
+    is_enabled?: boolean;
+  }) => api.post("/admin/llm/api-keys", data),
+
+  updateApiKey: (
+    keyId: string,
+    data: {
+      vendor_name?: string;
+      key_env_name?: string;
+      api_key_value?: string;
+      model?: string;
+      base_url?: string;
+      auth_type?: string;
+      description?: string;
+      is_enabled?: boolean;
+    },
+  ) => api.put(`/admin/llm/api-keys/${keyId}`, data),
+
+  deleteApiKey: (keyId: string) =>
+    api.delete(`/admin/llm/api-keys/${keyId}`),
+
+  toggleApiKey: (keyId: string) =>
+    api.put(`/admin/llm/api-keys/${keyId}/toggle`),
+
+  validateApiKey: (keyId: string) =>
+    api.post(`/admin/llm/api-keys/${keyId}/validate`),
+
+  // Scenarios
+  getScenarios: () => api.get("/admin/llm/scenarios"),
+
+  updateScenario: (
+    scenarioName: string,
+    data: {
+      description?: string;
+      temperature?: number;
+      max_tokens?: number;
+      timeout_seconds?: number;
+      is_enabled?: boolean;
+    },
+  ) => api.put(`/admin/llm/scenarios/${scenarioName}`, data),
+
+  // Scenario Keys (Key 池关联)
+  getScenarioKeys: (scenarioName: string) =>
+    api.get(`/admin/llm/scenario-keys/${scenarioName}`),
+
+  addScenarioKey: (
+    scenarioName: string,
+    data: { key_id: string; priority: number },
+  ) => api.post(`/admin/llm/scenario-keys/${scenarioName}`, data),
+
+  removeScenarioKey: (scenarioName: string, keyId: string) =>
+    api.delete(`/admin/llm/scenario-keys/${scenarioName}/${keyId}`),
+
+  updateScenarioKeyPriority: (
+    scenarioName: string,
+    keyId: string,
+    priority: number,
+  ) =>
+    api.put(`/admin/llm/scenario-keys/${scenarioName}/${keyId}/priority`, {
+      priority,
+    }),
 };
 
 export default api;

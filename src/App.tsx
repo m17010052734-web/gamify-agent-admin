@@ -12,6 +12,7 @@ import Categories from "./pages/Categories";
 import CreativeCategories from "./pages/CreativeCategories";
 import CreativeTemplates from "./pages/CreativeTemplates";
 import CacheManagement from "./pages/CacheManagement";
+import LLMConfig from "./pages/LLMConfig";
 import { ToastProvider } from "./contexts/ToastContext";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -70,6 +71,7 @@ function App() {
           <Route path="creative-categories" element={<CreativeCategories />} />
           <Route path="creative-templates" element={<CreativeTemplates />} />
           <Route path="cache-management" element={<CacheManagement />} />
+          <Route path="llm-config" element={<LLMConfig />} />
           <Route path="credits" element={<Credits />} />
           <Route path="review-logs" element={<ReviewLogs />} />
         </Route>

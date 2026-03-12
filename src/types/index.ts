@@ -31,6 +31,7 @@ export interface Game {
   author_id: string;
   author_nickname: string;
   status: string;
+  review_status: string;
   created_at: string;
   updated_at: string;
 }

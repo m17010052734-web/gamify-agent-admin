@@ -11,6 +11,8 @@ import {
   CodeBracketIcon,
   DocumentIcon,
   FolderIcon,
+  NoSymbolIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import {
   CheckCircleIcon as CheckCircleIconSolid,
@@ -46,6 +48,12 @@ export default function Games() {
 
   // Loading state
   const [reviewing, setReviewing] = useState(false);
+
+  // Offline modal
+  const [showOfflineModal, setShowOfflineModal] = useState(false);
+  const [offlineGame, setOfflineGame] = useState<Game | null>(null);
+  const [offlineMessage, setOfflineMessage] = useState('');
+  const [offlining, setOfflining] = useState(false);
 
   const toast = useToast();
 
@@ -96,6 +104,52 @@ export default function Games() {
     setSelectedGame(game);
     setReviewAction(action);
     setShowReviewModal(true);
+  };
+
+  const openOfflineModal = (game: Game) => {
+    setOfflineGame(game);
+    setOfflineMessage('');
+    setShowOfflineModal(true);
+  };
+
+  const handleOffline = async () => {
+    if (!offlineGame || offlining) return;
+
+    try {
+      setOfflining(true);
+      await gameApi.offlineGame({
+        game_id: offlineGame.id,
+        message: offlineMessage || undefined,
+      });
+      setShowOfflineModal(false);
+      setOfflineMessage('');
+      setOfflineGame(null);
+      loadGames();
+      toast.success('游戏下线成功');
+    } catch (err) {
+      console.error('Failed to offline game:', err);
+      toast.error('下线失败');
+    } finally {
+      setOfflining(false);
+    }
+  };
+
+  const handleReOnline = async (game: Game) => {
+    try {
+      setReviewing(true);
+      await gameApi.reviewGame({
+        game_id: game.id,
+        action: 'approve',
+        message: '重新上线',
+      });
+      loadGames();
+      toast.success('游戏已重新上线');
+    } catch (err) {
+      console.error('Failed to re-online game:', err);
+      toast.error('重新上线失败');
+    } finally {
+      setReviewing(false);
+    }
   };
 
   const openDetailModal = async (game: Game) => {
@@ -176,6 +230,7 @@ export default function Games() {
               <option value="shared">已共享</option>
               <option value="rejected">已拒绝</option>
               <option value="private">私有</option>
+              <option value="offline">已下线</option>
             </select>
           </div>
           <div className="flex items-center gap-2 text-sm">
@@ -233,7 +288,9 @@ export default function Games() {
                 <div className="absolute top-3 right-3">
                   <span
                     className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full shadow-lg backdrop-blur-md ${
-                      game.status === 'pending'
+                      game.review_status === 'offline'
+                        ? 'bg-orange-500/90 text-white'
+                        : game.status === 'pending'
                         ? 'bg-amber-500/90 text-white'
                         : game.status === 'shared'
                         ? 'bg-green-500/90 text-white'
@@ -246,12 +303,15 @@ export default function Games() {
                         : 'bg-gray-500/90 text-white'
                     }`}
                   >
-                    {game.status === 'pending' && <ClockIconSolid className="w-3.5 h-3.5" />}
+                    {game.review_status !== 'offline' && game.status === 'pending' && <ClockIconSolid className="w-3.5 h-3.5" />}
                     {game.status === 'shared' && <CheckCircleIconSolid className="w-3.5 h-3.5" />}
                     {game.status === 'rejected' && <XCircleIcon className="w-3.5 h-3.5" />}
                     {game.status === 'private' && <LockClosedIconSolid className="w-3.5 h-3.5" />}
+                    {game.review_status === 'offline' && <NoSymbolIcon className="w-3.5 h-3.5" />}
                     {game.status === 'archived' && <CubeIcon className="w-3.5 h-3.5" />}
-                    {game.status === 'pending'
+                    {game.review_status === 'offline'
+                      ? '已下线'
+                      : game.status === 'pending'
                       ? '待审核'
                       : game.status === 'shared'
                       ? '已共享'
@@ -309,7 +369,7 @@ export default function Games() {
                       预览
                     </button>
                   </div>
-                  {game.status === 'pending' && (
+                  {game.status === 'pending' && game.review_status !== 'offline' && (
                     <div className="flex gap-2">
                       <button
                         onClick={() => openReviewModal(game, 'approve')}
@@ -326,6 +386,30 @@ export default function Games() {
                       >
                         <XCircleIcon className="w-4 h-4" />
                         拒绝
+                      </button>
+                    </div>
+                  )}
+                  {game.status === 'shared' && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => openOfflineModal(game)}
+                        disabled={offlining}
+                        className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm text-sm sm:text-base"
+                      >
+                        <NoSymbolIcon className="w-4 h-4" />
+                        下线
+                      </button>
+                    </div>
+                  )}
+                  {game.review_status === 'offline' && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleReOnline(game)}
+                        disabled={reviewing}
+                        className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm text-sm sm:text-base"
+                      >
+                        <ArrowPathIcon className="w-4 h-4" />
+                        重新上线
                       </button>
                     </div>
                   )}
@@ -504,7 +588,9 @@ export default function Games() {
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">状态</p>
                 <span
                   className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ${
-                    gameDetail.status === 'pending'
+                    gameDetail.review_status === 'offline'
+                      ? 'bg-orange-100 text-orange-800'
+                      : gameDetail.status === 'pending'
                       ? 'bg-amber-100 text-amber-800'
                       : gameDetail.status === 'shared'
                       ? 'bg-green-100 text-green-800'
@@ -517,12 +603,15 @@ export default function Games() {
                       : 'bg-gray-100 text-gray-800'
                   }`}
                 >
-                  {gameDetail.status === 'pending' && <ClockIconSolid className="w-4 h-4" />}
+                  {gameDetail.review_status !== 'offline' && gameDetail.status === 'pending' && <ClockIconSolid className="w-4 h-4" />}
                   {gameDetail.status === 'shared' && <CheckCircleIconSolid className="w-4 h-4" />}
                   {gameDetail.status === 'rejected' && <XCircleIcon className="w-4 h-4" />}
                   {gameDetail.status === 'private' && <LockClosedIconSolid className="w-4 h-4" />}
+                  {gameDetail.review_status === 'offline' && <NoSymbolIcon className="w-4 h-4" />}
                   {gameDetail.status === 'archived' && <CubeIcon className="w-4 h-4" />}
-                  {gameDetail.status === 'pending'
+                  {gameDetail.review_status === 'offline'
+                    ? '已下线'
+                    : gameDetail.status === 'pending'
                     ? '待审核'
                     : gameDetail.status === 'shared'
                     ? '已共享'
@@ -626,6 +715,64 @@ export default function Games() {
             <p className="text-gray-500">无法加载预览</p>
           </div>
         )}
+      </Modal>
+
+      {/* Offline Modal */}
+      <Modal
+        isOpen={showOfflineModal && !!offlineGame}
+        onClose={() => {
+          setShowOfflineModal(false);
+          setOfflineGame(null);
+          setOfflineMessage('');
+        }}
+        title="下线游戏"
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm text-gray-600 mb-2">游戏名称</p>
+            <p className="font-medium text-gray-900">{offlineGame?.title}</p>
+          </div>
+
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+            <p className="text-sm text-orange-800">
+              下线后该游戏将从广场移除，用户将无法在广场浏览到该游戏。
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              下线原因（建议填写）
+            </label>
+            <textarea
+              value={offlineMessage}
+              onChange={(e) => setOfflineMessage(e.target.value)}
+              rows={3}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              placeholder="请输入下线原因，例如：内容不当、违规等"
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                setShowOfflineModal(false);
+                setOfflineGame(null);
+                setOfflineMessage('');
+              }}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-smooth cursor-pointer"
+            >
+              取消
+            </button>
+            <button
+              onClick={handleOffline}
+              disabled={offlining}
+              className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-smooth cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {offlining ? '处理中...' : '确认下线'}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

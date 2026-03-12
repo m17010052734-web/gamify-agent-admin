@@ -11,6 +11,7 @@ import {
   ClipboardDocumentListIcon,
   RectangleStackIcon,
   CircleStackIcon,
+  CpuChipIcon,
 } from "@heroicons/react/24/outline";
 
 const navigation = [
@@ -22,6 +23,7 @@ const navigation = [
   { name: "创意模板", href: "/creative-templates", icon: RectangleStackIcon },
   { name: "审核日志", href: "/review-logs", icon: ClipboardDocumentListIcon },
   { name: "积分配置", href: "/credits", icon: CreditCardIcon },
+  { name: "LLM 配置", href: "/llm-config", icon: CpuChipIcon },
   { name: "缓存管理", href: "/cache-management", icon: CircleStackIcon },
 ];
 
